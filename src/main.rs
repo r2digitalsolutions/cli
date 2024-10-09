@@ -1,7 +1,6 @@
 use clap::{Parser, Subcommand};
-use serde_json::{Map, Value};
-use std::collections::{HashMap, HashSet};
-use std::fs::{self, File};
+use std::collections::{HashSet};
+use std::fs::{self};
 use std::path::Path;
 mod utils;
 
