@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use serde_json::{json, Error, Map, Value};
+use serde_json::{Error, Map, Value};
 
 pub fn create_dir(idioma: &str) -> bool {
     println!("Creando el idioma {}", idioma);

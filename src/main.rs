@@ -95,7 +95,6 @@ fn listar_archivos() {
 fn create_lang(idioma: &str) {
     println!("Creando archivo el idioma {}", idioma);
     let ruta_locales = Path::new("locales");
-    let ruta_idioma = ruta_locales.join(idioma);
 
     if !utils::has_exist_directory(ruta_locales) {
         eprintln!("El directorio 'locales' no existe o no es un directorio.");
@@ -123,7 +122,7 @@ fn create_lang(idioma: &str) {
     generar_archivos();
 }
 
-fn crear_archivo(idioma: &str) {}
+fn crear_archivo(_idioma: &str) {}
 
 fn generar_archivos() {
     // generar ficheros JSON UNIDOS en uno solo con el nuevo JSON
