@@ -2,9 +2,10 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::Path,
+    str::FromStr,
 };
 
-use serde_json::{Error, Map, Value};
+use serde_json::{json, Error, Map, Value};
 
 pub fn create_dir(idioma: &str) -> bool {
     println!("Creando el idioma {}", idioma);
@@ -166,4 +167,62 @@ pub(crate) fn get_translations_keys(locales: HashSet<String>) -> String {
         .map(String::as_str)
         .collect::<Vec<&str>>()
         .join(", ");
+}
+
+fn recursive_keys(obj: Value, prefix: String) -> Map<String, Value> {
+    let mut keys = Map::new();
+
+    if let Value::Object(map) = obj {
+        for (key, value) in map {
+            let full_key = if prefix.is_empty() {
+                key.clone() // Si no hay prefijo, usamos la clave tal cual
+            } else {
+                format!("{}.{}", prefix, key) // Si hay prefijo, lo concatenamos
+            };
+
+            if value.is_object() {
+                // Si el valor es un objeto, llamamos recursivamente
+                let nested_keys = recursive_keys(value, full_key.clone());
+                keys.extend(nested_keys); // Extendemos el mapa actual con los resultados
+            } else {
+                // Si es un valor simple, lo agregamos al mapa
+                keys.insert(full_key.clone(), Value::String(full_key.clone()));
+            }
+        }
+    }
+
+    keys
+}
+
+pub(crate) fn generate_keys_file(obj_keys: String) {
+    let ruta_locales = Path::new("locales");
+
+    if !has_exist_directory(ruta_locales) {
+        eprintln!("El directorio 'locales' no existe o no es un directorio.");
+        return;
+    }
+
+    let parsed: Value = serde_json::from_str(&obj_keys).expect("Error al parsear el JSON");
+
+    let result = recursive_keys(parsed, "".to_string());
+
+    let mut template = String::from_str("export const I18N_TRANSLATIONS = {").unwrap();
+    let template_end = String::from_str("\n} as const;").unwrap();
+
+    let result_keys: Vec<String> = result
+        .keys()
+        .map(|k| k.to_string())
+        .collect::<Vec<String>>();
+
+    for key in result_keys {
+        let key_object = key.to_uppercase().replace(".", "_").replace("-", "_");
+        template.push_str(&format!("\n\t{}: \"{}\",", key_object, key));
+    }
+
+    template.push_str(&template_end);
+
+    fs::write(ruta_locales.join("translations.ts"), template)
+        .expect("Error al escribir el archivo");
+
+    println!("Se guardo el archivo 'translations.ts'");
 }

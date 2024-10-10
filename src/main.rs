@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use std::collections::{HashSet};
+use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
 mod utils;
@@ -119,6 +119,8 @@ fn create_lang(idioma: &str) {
         println!("No se pudieron crear archivos para el idioma {}", one_lang);
         return;
     }
+
+    generar_archivos();
 }
 
 fn crear_archivo(idioma: &str) {}
@@ -135,6 +137,7 @@ fn generar_archivos() {
     // Combinar los objetos JSON
     let mut file_data = String::new();
     let mut locales_data: HashSet<String> = HashSet::new();
+    let mut obj_keys = String::new();
 
     match fs::read_dir(locales_path) {
         Ok(locales) => {
@@ -160,11 +163,16 @@ fn generar_archivos() {
                         let union_json = utils::merge_json_files(locale_files).unwrap();
 
                         // SAVE JSON FILE
-                        let new_file = fs::write(locale_path.join("_index.json"), union_json);
+                        let new_file =
+                            fs::write(locale_path.join("_index.json"), union_json.clone());
 
                         if new_file.is_err() {
                             println!("Error al guardar el archivo 'all.json'");
                             return;
+                        }
+
+                        if obj_keys.is_empty() {
+                            obj_keys = union_json.clone();
                         }
 
                         let imports = format!(
@@ -187,7 +195,10 @@ fn generar_archivos() {
             if !file_data.is_empty() {
                 println!("Generando index.ts {}", file_data);
                 match fs::write(locales_path.join("index.ts"), file_data) {
-                    Ok(_) => println!("Se guardo el archivo 'index.ts'"),
+                    Ok(_) => {
+                        println!("Se guardo el archivo 'index.ts'");
+                        utils::generate_keys_file(obj_keys);
+                    }
                     Err(e) => eprintln!("Error al guardar el archivo 'index.ts': {}", e),
                 }
             }
