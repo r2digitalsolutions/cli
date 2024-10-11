@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::collections::HashSet;
 use std::fs::{self};
-use std::path::Path;
+use std::path::PathBuf;
+mod setting;
 mod utils;
 
 #[derive(Parser)]
@@ -40,7 +41,9 @@ fn main() {
 }
 
 fn listar_archivos() {
-    let ruta_locales = Path::new("locales");
+    let root: PathBuf = utils::get_project_lib();
+
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
 
     // Verificamos que la carpeta 'locales' exista
     if !ruta_locales.exists() || !ruta_locales.is_dir() {
@@ -93,10 +96,13 @@ fn listar_archivos() {
 }
 
 fn create_lang(idioma: &str) {
-    println!("Creando archivo el idioma {}", idioma);
-    let ruta_locales = Path::new("locales");
+    let root: PathBuf = utils::get_project_lib();
 
-    if !utils::has_exist_directory(ruta_locales) {
+    println!("Creando archivo el idioma {}", idioma);
+
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
+
+    if !ruta_locales.exists() {
         eprintln!("El directorio 'locales' no existe o no es un directorio.");
         return;
     }
@@ -125,10 +131,10 @@ fn create_lang(idioma: &str) {
 fn crear_archivo(_idioma: &str) {}
 
 fn generar_archivos() {
-    // generar ficheros JSON UNIDOS en uno solo con el nuevo JSON
-    let locales_path = Path::new("locales");
+    let root = utils::get_project_lib();
+    let locales_path = root.join(setting::PROJECT_LOCALES);
 
-    if !utils::has_exist_directory(locales_path) {
+    if !locales_path.exists() {
         println!("No hay directorio locales");
         return;
     }
@@ -138,7 +144,7 @@ fn generar_archivos() {
     let mut locales_data: HashSet<String> = HashSet::new();
     let mut obj_keys = String::new();
 
-    match fs::read_dir(locales_path) {
+    match fs::read_dir(locales_path.clone()) {
         Ok(locales) => {
             for locale in locales {
                 if let Ok(locale) = locale {

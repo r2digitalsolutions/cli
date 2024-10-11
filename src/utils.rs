@@ -1,15 +1,18 @@
 use std::{
     collections::{HashMap, HashSet},
-    fs,
-    path::Path,
+    env, fs,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
 use serde_json::{Error, Map, Value};
 
+use crate::setting;
+
 pub fn create_dir(idioma: &str) -> bool {
     println!("Creando el idioma {}", idioma);
-    let ruta_locales = Path::new("locales");
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
     let ruta_idioma = ruta_locales.join(idioma);
 
     if has_exist_locales(idioma.to_string()) {
@@ -23,7 +26,8 @@ pub fn create_dir(idioma: &str) -> bool {
 }
 
 pub fn get_first_lang() -> String {
-    let ruta_locales = Path::new("locales");
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
 
     // Verificamos que la carpeta 'locales' exista
     if !ruta_locales.exists() || !ruta_locales.is_dir() {
@@ -55,7 +59,8 @@ pub fn get_first_lang() -> String {
 }
 
 pub fn get_templates(idioma: String) -> HashMap<String, String> {
-    let ruta_locales = Path::new("locales");
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
     let ruta_idioma = ruta_locales.join(idioma.clone());
 
     if !has_exist_locales(idioma.clone()) {
@@ -97,8 +102,8 @@ pub fn get_templates(idioma: String) -> HashMap<String, String> {
 
 pub fn create_files(idioma: String, templates: HashMap<String, String>) -> bool {
     println!("Creando archivos para el idioma {}", idioma);
-
-    let ruta_locales = Path::new("locales");
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
     let ruta_idioma = ruta_locales.join(idioma.clone());
 
     // Verificamos que la carpeta 'locales' exista
@@ -120,7 +125,8 @@ pub fn create_files(idioma: String, templates: HashMap<String, String>) -> bool 
 }
 
 pub fn has_exist_locales(idioma: String) -> bool {
-    let ruta_locales = Path::new("locales");
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
 
     // Verificamos que la carpeta 'locales' exista
     if !ruta_locales.exists() || !ruta_locales.is_dir() {
@@ -138,14 +144,23 @@ pub fn has_exist_locales(idioma: String) -> bool {
     return true;
 }
 
-pub fn has_exist_directory(ruta_locales: &Path) -> bool {
-    // Verificamos que la carpeta 'locales' exista
-    if !ruta_locales.exists() || !ruta_locales.is_dir() {
-        eprintln!("El directorio 'locales' no existe o no es un directorio.");
-        return false;
+fn flatten_json(obj: Value) -> Value {
+    let mut flattened = Map::new();
+
+    if let Value::Object(map) = obj {
+        for (key, value) in map {
+            if value.is_object() {
+                let nested = flatten_json(value);
+                for (nested_key, nested_value) in nested.as_object().unwrap() {
+                    flattened.insert(format!("{}.{}", key, nested_key), nested_value.clone());
+                }
+            } else {
+                flattened.insert(key, value);
+            }
+        }
     }
 
-    return true;
+    Value::Object(flattened)
 }
 
 pub(crate) fn merge_json_files(locale_files: HashMap<String, String>) -> Result<String, Error> {
@@ -158,7 +173,12 @@ pub(crate) fn merge_json_files(locale_files: HashMap<String, String>) -> Result<
     });
 
     let merged_json = Value::Object(combined);
-    return serde_json::to_string_pretty(&merged_json);
+
+    // planar los valores de cada clave en un mismo objeto
+
+    let flattened = flatten_json(merged_json);
+
+    return serde_json::to_string_pretty(&flattened);
 }
 
 pub(crate) fn get_translations_keys(locales: HashSet<String>) -> String {
@@ -195,9 +215,10 @@ fn recursive_keys(obj: Value, prefix: String) -> Map<String, Value> {
 }
 
 pub(crate) fn generate_keys_file(obj_keys: String) {
-    let ruta_locales = Path::new("locales");
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
 
-    if !has_exist_directory(ruta_locales) {
+    if !ruta_locales.exists() {
         eprintln!("El directorio 'locales' no existe o no es un directorio.");
         return;
     }
@@ -225,4 +246,43 @@ pub(crate) fn generate_keys_file(obj_keys: String) {
         .expect("Error al escribir el archivo");
 
     println!("Se guardo el archivo 'translations.ts'");
+}
+
+/// Busca recursivamente la raíz del proyecto basada en la presencia de un archivo distintivo
+pub fn find_project_root(start_path: &Path, marker: &str) -> Option<PathBuf> {
+    let mut current_path = start_path.to_path_buf();
+
+    while current_path.parent().is_some() {
+        let marker_path = current_path.join(marker);
+        if marker_path.exists() {
+            return Some(current_path);
+        }
+        current_path.pop();
+    }
+
+    None
+}
+
+pub fn get_project_root() -> PathBuf {
+    let current_dir = env::current_dir().expect("No se pudo obtener el directorio actual");
+
+    // Definir el archivo o carpeta que marca la raíz del proyecto (por ejemplo, Cargo.toml)
+    let project_marker = setting::PROJECT_SEARCH_ROOT;
+
+    // Intentar encontrar la raíz del proyecto
+    if let Some(project_root) = find_project_root(&current_dir, project_marker) {
+        return project_root;
+    }
+
+    panic!("No se pudo encontrar la raíz del proyecto.");
+}
+
+pub fn get_project_lib() -> PathBuf {
+    let root_path = get_project_root().join(setting::get_project_lib());
+
+    if !root_path.exists() {
+        panic!("No se pudo encontrar la carpeta 'lib' en el proyecto.");
+    }
+
+    root_path
 }
