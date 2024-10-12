@@ -286,3 +286,40 @@ pub fn get_project_lib() -> PathBuf {
 
     root_path
 }
+
+pub(crate) fn get_langs() -> Vec<String> {
+    let root = get_project_lib();
+    let ruta_locales = root.join(setting::PROJECT_LOCALES);
+
+    if !ruta_locales.exists() {
+        eprintln!("El directorio 'locales' no existe o no es un directorio.");
+        return Vec::new();
+    }
+
+    // Iteramos sobre las subcarpetas (idiomas)
+    match fs::read_dir(ruta_locales) {
+        Ok(entradas) => {
+            let mut langs: Vec<String> = Vec::new();
+            for entrada in entradas {
+                if let Ok(entrada) = entrada {
+                    let ruta_idioma = entrada.path();
+
+                    if ruta_idioma.is_dir() {
+                        langs.push(
+                            ruta_idioma
+                                .file_name()
+                                .unwrap()
+                                .to_string_lossy()
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+            return langs;
+        }
+        Err(e) => {
+            eprintln!("Error al leer el directorio 'locales': {}", e);
+            return Vec::new();
+        }
+    }
+}

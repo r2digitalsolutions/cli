@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use serde_json::Value;
 use std::collections::HashSet;
 use std::fs::{self};
 use std::path::PathBuf;
@@ -27,6 +28,14 @@ enum Commands {
     },
     /// Genera archivos JSON a partir de una plantilla
     Generar,
+    AddKey {
+        #[clap(value_parser)]
+        file: String,
+        #[clap(value_parser)]
+        key: String,
+        #[clap(value_parser)]
+        value: String,
+    },
 }
 
 fn main() {
@@ -37,6 +46,7 @@ fn main() {
         Commands::Crear { idioma } => crear_archivo(idioma),
         Commands::CreateLang { lang } => create_lang(lang),
         Commands::Generar => generar_archivos(),
+        Commands::AddKey { file, key, value } => add_key(file, key, value),
     }
 }
 
@@ -210,4 +220,45 @@ fn generar_archivos() {
         }
         Err(e) => eprintln!("Error al leer el directorio 'locales': {}", e),
     }
+}
+
+fn add_key(file: &str, key: &str, value: &str) {
+    utils::get_langs().iter().for_each(|lang| {
+        let ruta_locales = utils::get_project_lib()
+            .join(setting::PROJECT_LOCALES)
+            .join(lang);
+
+        let ruta_archivo = ruta_locales.join(file.to_owned() + ".json");
+
+        if !ruta_archivo.exists() {
+            eprintln!("El archivo {} no existe", ruta_archivo.display());
+            return;
+        }
+
+        let file_content =
+            fs::read_to_string(ruta_archivo.clone()).expect("Error al leer el archivo JSON");
+
+        let mut obj: Value = serde_json::from_str(&file_content).unwrap();
+
+        if obj[key].is_string() {
+            eprintln!("La clave {} ya existe", key);
+            return;
+        }
+
+        obj[key] = Value::String(value.to_string());
+
+        let new_file = fs::write(
+            ruta_archivo.clone(),
+            serde_json::to_string_pretty(&obj).unwrap(),
+        );
+
+        if new_file.is_err() {
+            eprintln!("Error al guardar el archivo {}", ruta_archivo.display());
+            return;
+        }
+
+        println!("Se guardo el archivo {}", ruta_archivo.display());
+    });
+
+    generar_archivos();
 }
